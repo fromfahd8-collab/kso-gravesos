@@ -5,29 +5,38 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 90
     
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Install live-build
+    - name: Install live-build + keys
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y live-build debootstrap squashfs-tools xorriso espeak-ng xdotool openbox x11-xserver-utils unclutter wget unzip p7zip-full -qq
+        sudo apt-get install -y live-build debootstrap debian-archive-keyring squashfs-tools xorriso espeak-ng xdotool openbox x11-xserver-utils unclutter wget unzip p7zip-full -qq
         
-    - name: Setup ISO Config
+    - name: Setup ISO Config - Debian Mirrors
       run: |
         mkdir gravesos && cd gravesos
-        lb config --architecture amd64 --distribution bookworm \
+        lb config \
+          --architecture amd64 \
+          --distribution bookworm \
+          --mode debian \
+          --mirror-bootstrap "http://deb.debian.org/debian/" \
+          --mirror-chroot "http://deb.debian.org/debian/" \
+          --mirror-chroot-security "http://security.debian.org/debian-security" \
+          --mirror-binary "http://deb.debian.org/debian/" \
+          --mirror-binary-security "http://security.debian.org/debian-security" \
           --archive-areas "main contrib non-free non-free-firmware" \
           --binary-images iso-hybrid \
           --bootappend-live "boot=live quiet splash hostname=PARANOIA" \
-          --iso-volume "KSO_PARANOIA" --debian-installer none \
-          --bootstrap debootstrap
+          --iso-volume "KSO_PARANOIA" \
+          --debian-installer none \
+          --apt-indices false \
+          --apt-recommends false
         
-        # هنا الحل: coreutils + base-files لازم يبقوا موجودين
         echo "coreutils base-files openbox xterm espeak-ng xdotool x11-xserver-utils wine64 unclutter p7zip-full" > config/package-lists/paranoia.list.chroot
         
     - name: Add Boot Message - برمجة عبدالله وعبدالرحمن
@@ -94,7 +103,6 @@ jobs:
         export DISPLAY=:0
         sleep 15
         
-        # عبدالله - المراقب
         (
         while true; do
           sleep $((RANDOM % 90 + 60))
@@ -103,7 +111,6 @@ jobs:
         done
         ) &
         
-        # عبدالرحمن - المخترق  
         (
         sleep 10
         while true; do
@@ -116,14 +123,12 @@ jobs:
         done
         ) &
         
-        # طبقة 1: لعب في الوقت
         while true; do
           sleep $((RANDOM % 1800 + 300))
           offset=$((RANDOM % 14 - 7))
           date -s "$(date -d "$offset minutes")" 2>/dev/null || true
         done &
         
-        # طبقة 2: يقلد أخطاءك في الكيبورد
         xinput test-xi2 --root 2>/dev/null | grep --line-buffered "KeyPress" | while read line; do
           echo "$line" >> /tmp/.keys
           if grep -q "sl" /tmp/.keys; then
@@ -133,13 +138,11 @@ jobs:
           fi
         done &
         
-        # طبقة 3: الماوس بيختفي
         while true; do
           sleep $((RANDOM % 300 + 60))
           unclutter -idle 0.1 -timeout 1 2>/dev/null &
         done &
         
-        # طبقة 4: نبوءات كدابة
         while true; do
           sleep $((RANDOM % 3600 + 600))
           future=$(date -d "+$((RANDOM % 10 + 2)) minutes" +%H:%M)
