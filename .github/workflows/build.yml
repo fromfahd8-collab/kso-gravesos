@@ -24,16 +24,17 @@ jobs:
           --archive-areas "main contrib non-free non-free-firmware" \
           --binary-images iso-hybrid \
           --bootappend-live "boot=live quiet splash hostname=PARANOIA" \
-          --iso-volume "KSO_PARANOIA" --debian-installer none
+          --iso-volume "KSO_PARANOIA" --debian-installer none \
+          --bootstrap debootstrap
         
-        echo "openbox xterm espeak-ng xdotool x11-xserver-utils wine64 unclutter p7zip-full" > config/package-lists/paranoia.list.chroot
+        # هنا الحل: coreutils + base-files لازم يبقوا موجودين
+        echo "coreutils base-files openbox xterm espeak-ng xdotool x11-xserver-utils wine64 unclutter p7zip-full" > config/package-lists/paranoia.list.chroot
         
     - name: Add Boot Message - برمجة عبدالله وعبدالرحمن
       run: |
         cd gravesos
         mkdir -p config/includes.chroot/etc
         
-        # 1. رسالة البوت - بتظهر قبل تسجيل الدخول
         cat > config/includes.chroot/etc/issue << 'EOF'
         
         KSO-GravesOS v6 PARANOIA
@@ -42,7 +43,6 @@ jobs:
         
         EOF
         
-        # 2. رسالة الترحيب بعد الدخول
         cat > config/includes.chroot/etc/motd << 'EOF'
 
          برمجة بواسطة: عبد الله و عبد الرحمن 
@@ -50,25 +50,6 @@ jobs:
 
         الكيان شايفك... هروبك مستحيل
 
-        EOF
-        
-        # 3. خلفية البوت grub
-        mkdir -p config/bootloaders
-        cat > config/bootloaders/grub.cfg << 'EOF'
-        set timeout=5
-        set default=0
-        
-        menuentry "KSO-GravesOS v6 PARANOIA" {
-            linux /live/vmlinuz boot=live quiet splash
-            initrd /live/initrd.img
-        }
-        
-        menuentry "برمجة: عبد الله و عبد الرحمن هاني رجب [ kso ]" {
-            echo "الكيان منتظرك..."
-            sleep 3
-            linux /live/vmlinuz boot=live quiet splash
-            initrd /live/initrd.img
-        }
         EOF
         
     - name: Download 5 Horror Games
@@ -108,7 +89,6 @@ jobs:
         mkdir -p config/includes.chroot/etc/skel/.config/openbox
         mkdir -p config/hooks/normal
         
-        # الكيان الرئيسي - 4 طبقات بارانويا + عبدالله + عبدالرحمن
         cat > config/includes.chroot/usr/bin/kso-paranoia << 'EOF'
         #!/bin/bash
         export DISPLAY=:0
@@ -169,7 +149,6 @@ jobs:
         EOF
         chmod +x config/includes.chroot/usr/bin/kso-paranoia
         
-        # اللانشر المرعب
         cat > config/includes.chroot/usr/bin/kso-launcher << 'EOF'
         #!/bin/bash
         sleep 20
@@ -190,7 +169,6 @@ jobs:
         EOF
         chmod +x config/includes.chroot/usr/bin/kso-launcher
         
-        # Openbox + قفل Win+Q
         cat > config/includes.chroot/etc/skel/.config/openbox/rc.xml << 'EOF'
         <openbox_config>
         <keyboard>
@@ -201,13 +179,11 @@ jobs:
         </openbox_config>
         EOF
         
-        # Autostart
         cat > config/includes.chroot/etc/skel/.config/openbox/autostart << 'EOF'
         kso-paranoia &
         sleep 10 && kso-launcher &
         EOF
         
-        # قفل النت
         cat > config/hooks/normal/0999-kso-safe.chroot << 'EOF'
         #!/bin/bash
         systemctl disable NetworkManager networking 2>/dev/null || true
