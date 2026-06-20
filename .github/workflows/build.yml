@@ -1,0 +1,109 @@
+name: Build KSO-GravesOS v6 PARANOIA -   [ kso ] برمجة عبدالله وعبدالرحمن هاني رجب 
+on: 
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install live-build
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y live-build debootstrap squashfs-tools xorriso wget unzip p7zip-full
+
+      - name: Setup live-build config
+        run: |
+          mkdir gravesos && cd gravesos
+          lb config --architecture amd64 --distribution bookworm \
+            --archive-areas "main contrib non-free" --binary-images iso-hybrid \
+            --bootappend-live "boot=live quiet splash hostname=PARANOIA" \
+            --iso-volume "KSO_PARANOIA" --debian-installer none
+          
+          echo "openbox xterm espeak-ng xdotool x11-xserver-utils wine64 unclutter p7zip-full" > config/package-lists/paranoia.list.chroot
+
+      - name: Download 5 Horror Games - 2.1GB
+        run: |
+          cd gravesos
+          mkdir -p config/includes.chroot/opt/kso-games
+          
+          echo "1. Slender..."
+          wget -q "https://archive.org/download/Slender_The_Eight_Pages_v0.9.7/Slender_The_Eight_Pages_v0.9.7.zip" -O /tmp/slender.zip
+          unzip -q /tmp/slender.zip -d config/includes.chroot/opt/kso-games/Slender
+          
+          echo "2. SCP-CB..."
+          wget -q "https://archive.org/download/SCPContainmentBreachv1.3.11/SCP%20-%20Containment%20Breach%20v1.3.11.zip" -O /tmp/scp.zip
+          unzip -q /tmp/scp.zip -d config/includes.chroot/opt/kso-games/SCP-CB
+          
+          echo "3. Imscared..."
+          wget -q "https://archive.org/download/ImscaredAGameThatPlaysYou/Imscared.zip" -O /tmp/imscared.zip
+          unzip -q /tmp/imscared.zip -d config/includes.chroot/opt/kso-games/Imscared
+          
+          echo "4. The House 2..."
+          mkdir -p config/includes.chroot/opt/kso-games/House2
+          wget -q "https://archive.org/download/TheHouse2_201808/The%20House%202.swf" -O config/includes.chroot/opt/kso-games/House2/house2.swf
+          
+          echo "5. Spooky's..."
+          wget -q "https://archive.org/download/spookys-jump-scare-mansion-v3.1.2/Spooky's%20Jump%20Scare%20Mansion%20v3.1.2.zip" -O /tmp/spooky.zip
+          unzip -q /tmp/spooky.zip -d config/includes.chroot/opt/kso-games/Spooky
+
+      - name: Add Paranoia Entity + عبدالله وعبدالرحمن Features
+        run: |
+          cd gravesos
+          mkdir -p config/includes.chroot/usr/bin
+          mkdir -p config/includes.chroot/etc/skel/.config/openbox
+          mkdir -p config/hooks/normal
+          
+          # الكيان - 4 طبقات بارانويا
+          cat > config/includes.chroot/usr/bin/kso-paranoia << 'EOF'
+          #!/bin/bash
+          export DISPLAY=:0
+          while true; do sleep $((RANDOM%1800+300)); offset=$((RANDOM%14-7)); date -s "$(date -d "$offset minutes")"; done &
+          xinput test-xi2 --root | grep --line-buffered "KeyPress" | while read line; do echo "$line" >> /tmp/.keys; if grep -q "sl" /tmp/.keys; then sleep 600; xdotool type "sl"; > /tmp/.keys; fi; done &
+          while true; do sleep $((RANDOM%300+60)); unclutter -idle 0.1 -timeout 1 & done &
+          while true; do sleep $((RANDOM%3600+600)); future=$(date -d "+$((RANDOM%10+2)) minutes" +%H:%M); mkdir -p /home/user/Desktop; echo "الساعة $future هتفهم كل حاجة" > /home/user/Desktop/رسالة_لك.txt; done &
+          EOF
+          
+          # اللانشر المرعب
+          cat > config/includes.chroot/usr/bin/kso-launcher << 'EOF'
+          #!/bin/bash
+          while true; do clear; echo "هتلعب يعني هتلعب"; games=(/opt/kso-games/*); selected="${games[$RANDOM % ${#games[@]}]}"; echo "اخترتلك: $(basename $selected)"; sleep 1; cd "$selected"; ./* 2>/dev/null || wine *.exe 2>/dev/null & pid=$!; wait $pid; sleep 40; notify-send "الكيان" "مكملناش لعب" -u critical; done
+          EOF
+          
+          # قفل Win+Q + رسالة صوتية - برمجة عبدالله وعبدالرحمن
+          cat > config/includes.chroot/etc/skel/.config/openbox/rc.xml << 'EOF'
+          <openbox_config>
+          <keyboard>
+            <keybind key="W-q">
+              <action name="Execute"><command>bash -c 'hours=$(uptime -p | grep -o "[0-9]*" | head -1); espeak-ng -v ar "قعدت $hours بس؟ كنت فاكرك أقوى" & sleep 3 & systemctl poweroff'</command></action>
+            </keybind>
+          </keyboard>
+          </openbox_config>
+          EOF
+          
+          cat > config/includes.chroot/etc/skel/.config/openbox/autostart << 'EOF'
+          kso-paranoia &
+          sleep 10 && kso-launcher &
+          EOF
+          
+          # قفل النت للأمان
+          cat > config/hooks/normal/0999-kso-safe.chroot << 'EOF'
+          #!/bin/bash
+          systemctl disable NetworkManager networking
+          EOF
+          
+          chmod +x config/includes.chroot/usr/bin/kso-*
+          chmod +x config/hooks/normal/0999-kso-safe.chroot
+
+      - name: Build ISO - 40 min
+        run: |
+          cd gravesos
+          sudo lb build
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KSO-GravesOS-v6-PARANOIA-عبدالله_وعبدالرحمن
+          path: gravesos/live-image-amd64.hybrid.iso
+          retention-days: 3
